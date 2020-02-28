@@ -23,6 +23,8 @@ let package = Package(
             dependencies: []),
         .testTarget(
             name: "ZSWTaggedStringSwiftTests",
-            dependencies: ["ZSWTaggedStringSwift"]),
+            dependencies: [
+							"ZSWTaggedStringSwift",
+				]),
     ]
 )

@@ -1,6 +1,6 @@
 import Foundation
 
-open class ZSWStringParserTag: NSObject {
+public struct ZSWStringParserTag {
 	public let tagName: String
 	public let location: Int
 	var endLocation: Int
@@ -15,22 +15,13 @@ open class ZSWStringParserTag: NSObject {
 		self.location = location
 		self.endLocation = location
 		self.tagAttributes = [:]
-		super.init()
 	}
 	
-	open override var description: String {
-		#if DEBUG
-		return String(format: "<%@: %p; tag: %@, isEndingTag: %@, rawAttributes: %@, parsedAttributes: %@>", NSStringFromClass(Self.self), self, tagName, isEndingTag ? "YES" : "NO", rawAttributes, tagAttributes)
-		#else
-		return String(format: "<%@: %p; tag: %@, isEndingTag: %@, rawAttributes: %@, parsedAttributes: %@>", NSStringFromClass(Self.self), self, tagName, isEndingTag ? "YES" : "NO", tagAttributes)
-		#endif
-	}
-	
-	open var isEndingTag: Bool {
+	public var isEndingTag: Bool {
 		return tagName.hasPrefix("/")
 	}
 	
-	open func isEnded(by tag: ZSWStringParserTag) -> Bool {
+	public func isEnded(by tag: ZSWStringParserTag) -> Bool {
 		if !tag.isEndingTag {
 			return false
 		}
@@ -42,14 +33,14 @@ open class ZSWStringParserTag: NSObject {
 		return true
 	}
 	
-	open func update(with tag: ZSWStringParserTag) {
+	public mutating func update(with tag: ZSWStringParserTag) {
 		guard isEnded(by: tag) else {
 			preconditionFailure("Didn't check before updating tag")
 		}
 		endLocation = tag.location
 	}
 	
-	open var tagRange: NSRange {
+	public var tagRange: NSRange {
 		if endLocation < location {
 			return NSMakeRange(location, 0)
 		} else {
@@ -57,7 +48,7 @@ open class ZSWStringParserTag: NSObject {
 		}
 	}
 	
-	open func addRawTagAttributes(_ rawTagAttributes: String) {
+	public mutating func addRawTagAttributes(_ rawTagAttributes: String) {
 		let scanner = Scanner(string: rawTagAttributes)
 		scanner.charactersToBeSkipped = nil
 		
@@ -69,29 +60,27 @@ open class ZSWStringParserTag: NSObject {
 		
 		while !scanner.isAtEnd {
 			// eat any whitespace at the start
-			scanner.scanCharacters(from: whitespaceSet, into: nil)
+			Helper.scanCharacters(using: scanner, from: whitespaceSet)
 			if scanner.isAtEnd {
 				// e.g., a tag like <dog ></dog> might produce just a space attribute
 				break
 			}
 			
 			// Scan up to '=' or ' '
-			var attributeName: NSString?
-			scanner.scanUpToCharacters(from: nameBreakSet, into: &attributeName)
+			let attributeName = Helper.scanUpToCharacters(using: scanner, from: nameBreakSet)
 			
-			var breakString: NSString?
-			scanner.scanCharacters(from: nameBreakSet, into: &breakString)
+			let breakString = Helper.scanCharacters(using: scanner, from: nameBreakSet)
 			
 			if !(scanner.isAtEnd || breakString?.range(of: "=") == nil) {
 				// We had an equal! Yay! We can use the value.
-				var quote: NSString?
-				let ateQuote = scanner.scanCharacters(from: quoteCharacterSet, into: &quote)
+				let quote = Helper.scanCharacters(using: scanner, from: quoteCharacterSet)
+				let ateQuote = quote?.isEmpty == false
 				
-				var attributeValue: NSString?
+				let attributeValue: String?
 				if ateQuote {
 					// For empty values (e.g. ''), we need to see if we scanned more than one quote.
 					var count = 0
-					if let quote = quote {
+					if let quote = quote as NSString? {
 						for idx in 0 ..< quote.length {
 							if let char = UnicodeScalar(quote.character(at: idx)),
 								quoteCharacterSet.contains(char) {
@@ -103,12 +92,12 @@ open class ZSWStringParserTag: NSObject {
 					if count > 1 {
 						attributeValue = ""
 					} else {
-						scanner.scanUpToCharacters(from: quoteCharacterSet, into: &attributeValue)
-						scanner.scanCharacters(from: quoteCharacterSet, into: nil)
+						attributeValue = Helper.scanUpToCharacters(using: scanner, from: quoteCharacterSet)
+						Helper.scanCharacters(using: scanner, from: quoteCharacterSet)
 					}
 				} else {
-					scanner.scanUpToCharacters(from: whitespaceSet, into: &attributeValue)
-					scanner.scanCharacters(from: whitespaceSet, into: nil)
+					attributeValue = Helper.scanUpToCharacters(using: scanner, from: whitespaceSet)
+					Helper.scanCharacters(using: scanner, from: whitespaceSet)
 				}
 				if let attributeName = attributeName as String?,
 					let attributeValue = attributeValue as String? {

@@ -5,22 +5,14 @@ let kTagEnd = ">"
 let kTagIgnore = "\01"
 let kIgnoredTagStart = "\01<"
 
-extension unichar: ExpressibleByUnicodeScalarLiteral {
-	public typealias UnicodeScalarLiteralType = UnicodeScalar
-	
-	public init(unicodeScalarLiteral scalar: UnicodeScalar) {
-		self.init(scalar.value)
-	}
-}
-
 public func ZSWEscapedString(for unescapedString: String) -> String {
 	return unescapedString.replacingOccurrences(of: kTagStart, with: kIgnoredTagStart)
 }
 
-open class ZSWStringParser: NSObject {
+public struct ZSWStringParser {
 	public let attributedString: NSAttributedString
 	
-	open var string: String {
+	public var string: String {
 		return attributedString.string
 	}
 	
@@ -40,9 +32,8 @@ open class ZSWStringParser: NSObject {
 		let tagEndCharacterSet = CharacterSet(charactersIn: kTagEnd)
 		
 		while !scanner.isAtEnd {
-			var scratchString: NSString?
-			scanner.scanUpToCharacters(from: tagStartCharacterSet, into: &scratchString)
-			Self.append(string: scratchString, into: pendingString)
+			var scratchString = Helper.scanUpToCharacters(using: scanner, from: tagStartCharacterSet)
+			Helper.append(string: scratchString, into: pendingString)
 			
 			if scanner.isAtEnd {
 				// No tag were found; we're done.
@@ -50,32 +41,31 @@ open class ZSWStringParser: NSObject {
 			}
 			
 			// Eat the < nom nom nom
-			scanner.scanCharacters(from: tagStartCharacterSet, into: nil)
+			Helper.scanCharacters(using: scanner, from: tagStartCharacterSet)
 			
-			if let str = scratchString, String(str.character(at: str.length - 1)) == kTagIgnore {
+			if let str = scratchString?.last, String(str) == kTagIgnore {
 				// We found a tag start, but it's one that's been escaped. Skip it, and append the start tag we just gobbled up.
 				pendingString.deleteCharacters(in: NSMakeRange(pendingString.length - 1, 1))
-				Self.append(string: kTagStart as NSString?, into: pendingString)
+				Helper.append(string: kTagStart, into: pendingString)
 				continue
 			}
 			
-			scratchString = nil
-			scanner.scanUpToCharacters(from: tagEndCharacterSet, into: &scratchString)
+			scratchString = Helper.scanUpToCharacters(using: scanner, from: tagEndCharacterSet)
 			if scanner.isAtEnd {
-				Self.append(string: scratchString, into: pendingString)
+				Helper.append(string: scratchString, into: pendingString)
 				break
 			}
 			
 			// Eat the > nom nom nom
-			scanner.scanCharacters(from: tagEndCharacterSet, into: nil)
+			Helper.scanCharacters(using: scanner, from: tagEndCharacterSet)
 			
 			let tagScanner = Scanner(string: scratchString as String? ?? "")
-			var tagName: NSString?
-			let scannedSpace = tagScanner.scanUpToCharacters(from: .whitespaces, into: &tagName)
-			if let tagName = tagName as String? {
-				let tag = ZSWStringParserTag(tagName: tagName, location: pendingString.length)
+			let tagName = Helper.scanUpToCharacters(using: tagScanner, from: .whitespaces)
+			let scannedSpace = tagName?.trimmingCharacters(in: .whitespaces).isEmpty == false
+			if let tagName = tagName {
+				var tag = ZSWStringParserTag(tagName: tagName, location: pendingString.length)
 				if scannedSpace, parseTagAttributes {
-					tagScanner.scanCharacters(from: .whitespaces, into: nil)
+					Helper.scanCharacters(using: tagScanner, from: .whitespaces)
 					let str = tagScanner.string
 					let idx = str.index(str.startIndex, offsetBy: tagScanner.scanLocation)
 					let attrsStr = String(str[idx...])
@@ -83,7 +73,7 @@ open class ZSWStringParser: NSObject {
 				}
 				
 				let lastTag = tagStack.last
-				if let lastTag = lastTag, lastTag.isEnded(by: tag) {
+				if var lastTag = lastTag, lastTag.isEnded(by: tag) {
 					lastTag.update(with: tag)
 					tagStack.removeLast()
 					finishedTags.insert(lastTag, at: 0)
@@ -106,14 +96,7 @@ open class ZSWStringParser: NSObject {
 				userInfo: ["developerError": String(format: "Reached end of string with %@ tags remaining (%@)", tagStack.count, tagStack.map { $0.tagName }.joined(separator: ", "))]
 			)
 		}
-		options._private_updateAttributedString(string: pendingString, updatedWith: finishedTags)
+		options.updateAttributedString(string: pendingString, updatedWith: finishedTags)
 		attributedString = pendingString
-		super.init()
-	}
-	
-	public static func append(string: NSString?, into attributedString: NSMutableAttributedString) {
-		guard let string = string as String?, !string.isEmpty else { return }
-		
-		attributedString.append(NSAttributedString(string: string))
 	}
 }

@@ -1,3 +1,3 @@
 # ZSWTaggedStringSwift
 
-A description of this package.
+Swift implementation for [https://github.com/zacwest/ZSWTaggedString](https://github.com/zacwest/ZSWTaggedString)

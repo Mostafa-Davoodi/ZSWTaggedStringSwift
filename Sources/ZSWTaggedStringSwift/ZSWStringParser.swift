@@ -93,7 +93,7 @@ public struct ZSWStringParser {
 			throw NSError(
 				domain: ZSW_TAGGED_STRING_ERROR_DOMAIN,
 				code: ZSWTaggedStringErrorCode.invalidTags.hashValue,
-				userInfo: ["developerError": String(format: "Reached end of string with %@ tags remaining (%@)", tagStack.count, tagStack.map { $0.tagName }.joined(separator: ", "))]
+				userInfo: ["developerError": String(format: "Reached end of string with %i tags remaining (%@)", tagStack.count, tagStack.map { $0.tagName }.joined(separator: ", "))]
 			)
 		}
 		options.updateAttributedString(string: pendingString, updatedWith: finishedTags)
